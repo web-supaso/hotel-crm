@@ -10,7 +10,9 @@ interface SnapRow {
   lead_id: string;
   created_at: string;
   estimated_close_days: number | null;
-  overall_score: number;
+  overall_score: number | null;
+  ground_truth: boolean | null;
+  rep_feedback: string | null;
 }
 
 // POST /api/cron/daily — llamado por Vercel Cron (o un cron externo).
@@ -37,7 +39,7 @@ export async function POST() {
       .in("lead_id", ids),
     supabase
       .from("score_snapshots")
-      .select("lead_id, created_at, estimated_close_days, overall_score")
+      .select("lead_id, created_at, estimated_close_days, overall_score, ground_truth, rep_feedback")
       .in("lead_id", ids),
   ]);
 
@@ -54,62 +56,74 @@ export async function POST() {
   for (const lead of leads as Lead[]) {
     const leadInteractions = interactionRows.filter((i) => i.lead_id === lead.id);
 
-    const latest = latestSnap.get(lead.id);
-    const needsRescore =
-      !latest ||
-      leadInteractions.some((i: Interaction) => new Date(i.occurred_at) > new Date(latest.created_at));
+const latest = latestSnap.get(lead.id);
+        const needsRescore =
+          !latest ||
+          leadInteractions.some((i: Interaction) => new Date(i.occurred_at) > new Date(latest.created_at));
 
-    if (needsRescore) {
-      try {
-        const list = leadInteractions
-          .sort((a: Interaction, b: Interaction) =>
-            new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
-          )
-          .slice(0, 10);
+        if (needsRescore) {
+          try {
+            const list = leadInteractions
+              .sort((a: Interaction, b: Interaction) =>
+                new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
+              )
+              .slice(0, 10);
 
-        const stakeholders = new Set(
-          list.map((i: Interaction) => i.contact_name?.trim()).filter(Boolean),
-        );
+            const stakeholders = new Set(
+              list.map((i: Interaction) => i.contact_name?.trim()).filter(Boolean),
+            );
 
-        const result = await scoreLead({
-          name: lead.name,
-          company: lead.company,
-          segment: lead.company_segment,
-          companySize: lead.company_size,
-          lastInteractionDate: list[0]?.occurred_at ?? null,
-          count: list.length,
-          stakeholdersCount: stakeholders.size,
-          daysInPipeline: daysSince(lead.created_at),
-          interactions: list.map((i: Interaction) => ({
-            type: i.type,
-            direction: i.direction,
-            summary: i.summary,
-            contactName: i.contact_name,
-            contactRole: i.contact_role,
-            occurredAt: i.occurred_at,
-          })),
-        });
+            const prevOutcome = latest?.ground_truth == null
+              ? null
+              : latest.ground_truth ? "won" : "lost";
 
-        await supabase.from("score_snapshots").insert({
-          lead_id: lead.id,
-          classification: result.classification,
-          overall_score: result.overall_score,
-          dimension_scores: result.dimension_scores,
-          risk_penalty: result.risk_penalty,
-          confidence: result.confidence,
-          predicted_close_probability: result.predicted_close_probability,
-          estimated_close_days: result.estimated_close_days,
-          estimated_deal_value_signal: result.estimated_deal_value_signal,
-          priority_level: result.priority_level,
-          next_best_action: result.next_best_action,
-          follow_up_days: result.follow_up_days,
-          reasoning: result.reasoning,
-          key_signals: result.key_signals,
-          data_gaps: result.data_gaps,
-          escalate_to_manager: result.escalate_to_manager,
-          model: result.model,
-          prompt_version: result.prompt_version,
-        });
+            const result = await scoreLead({
+              name: lead.name,
+              company: lead.company,
+              segment: lead.company_segment,
+              companySize: lead.company_size,
+              dealValue: lead.deal_value_estimate,
+              lastInteractionDate: list[0]?.occurred_at ?? null,
+              count: list.length,
+              stakeholdersCount: stakeholders.size,
+              daysInPipeline: daysSince(lead.created_at),
+              previousOverallScore: latest?.overall_score ?? null,
+              previousPredictionOutcome: prevOutcome,
+              repFeedback: latest?.rep_feedback ?? null,
+              interactions: list.map((i: Interaction) => ({
+                type: i.type,
+                direction: i.direction,
+                summary: i.summary,
+                contactName: i.contact_name,
+                contactRole: i.contact_role,
+                occurredAt: i.occurred_at,
+              })),
+            });
+
+            await supabase.from("score_snapshots").insert({
+              lead_id: lead.id,
+              classification: result.classification,
+              overall_score: result.overall_score,
+              trajectory_trend: result.trajectory_trend,
+              dimension_scores: result.dimension_scores,
+              risk_penalty: result.risk_penalty,
+              confidence: result.confidence,
+              predicted_close_probability: result.predicted_close_probability,
+              estimated_close_days: result.estimated_close_days,
+              estimated_deal_value_signal: result.estimated_deal_value_signal,
+              priority_level: result.priority_level,
+              pre_call_briefing: result.pre_call_briefing,
+              next_best_action: result.next_best_action,
+              follow_up_days: result.follow_up_days,
+              objection_risk: result.objection_risk,
+              reasoning: result.reasoning,
+              key_signals: result.key_signals,
+              data_gaps: result.data_gaps,
+              escalate_to_manager: result.escalate_to_manager,
+              active_learning_note: result.active_learning_note,
+              model: result.model,
+              prompt_version: result.prompt_version,
+            });
 
         await supabase
           .from("leads")

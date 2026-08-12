@@ -1,6 +1,31 @@
 import { STATUS_COLOR, PRIORITY_COLOR } from "@/lib/revenue";
 import type { LeadStatus } from "@/lib/types";
 
+const TREND_COLOR: Record<string, string> = {
+  improving: "bg-emerald-100 text-emerald-700",
+  declining: "bg-rose-100 text-rose-700",
+  stable: "bg-slate-100 text-slate-600",
+  new: "bg-indigo-100 text-indigo-700",
+};
+
+const TREND_LABELS: Record<string, string> = {
+  improving: "↑ Mejorando",
+  declining: "↓ Declinando",
+  stable: "= Estable",
+  new: "● Nuevo",
+};
+
+export function TrajectoryBadge({ trend }: { trend: string | null }) {
+  if (!trend || !TREND_COLOR[trend]) return null;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${TREND_COLOR[trend]}`}
+    >
+      {TREND_LABELS[trend]}
+    </span>
+  );
+}
+
 export function StatusBadge({ status }: { status: LeadStatus }) {
   return (
     <span

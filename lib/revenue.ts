@@ -140,3 +140,60 @@ export function stuckDeals(leads: LeadWithStats[]) {
     return daysSince(snap.created_at) > snap.estimated_close_days;
   });
 }
+
+export type AutomationTrigger =
+  | "notify_manager_single_threaded"
+  | "suggest_exec_sponsor"
+  | "trigger_rescue_playbook"
+  | "move_to_high_value_nurture"
+  | "follow_up_overdue"
+  | "escalate_to_manager";
+
+// Reglas determinísticas → el LLM NO dispara automatizaciones.
+export function deriveAutomationTriggers(
+  lead: LeadWithStats | null,
+  snapshot: ScoreSnapshot | null,
+): AutomationTrigger[] {
+  if (!snapshot) return [];
+  const triggers: AutomationTrigger[] = [];
+
+  const committee = snapshot.dimension_scores?.committee ?? 0;
+  const icp = snapshot.dimension_scores?.icp_fit ?? 0;
+  const signals = snapshot.key_signals ?? [];
+
+  if (committee > 0 && committee < 50) {
+    triggers.push("notify_manager_single_threaded");
+  }
+  if (snapshot.objection_risk === "budget") {
+    triggers.push("suggest_exec_sponsor");
+  }
+  if (signals.includes("45d_silence") || snapshot.objection_risk === "silence") {
+    triggers.push("trigger_rescue_playbook");
+  }
+  if (
+    snapshot.priority_level === "nurture" &&
+    icp >= 80 &&
+    (lead?.last_interaction_at == null || daysSince(lead.last_interaction_at) > 90)
+  ) {
+    triggers.push("move_to_high_value_nurture");
+  }
+  if (snapshot.follow_up_days != null && snapshot.created_at) {
+    const due = new Date(snapshot.created_at);
+    due.setDate(due.getDate() + snapshot.follow_up_days);
+    if (due < new Date()) triggers.push("follow_up_overdue");
+  }
+  if (snapshot.escalate_to_manager) {
+    triggers.push("escalate_to_manager");
+  }
+
+  return triggers;
+}
+
+export const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
+  notify_manager_single_threaded: "Notificar manager (single-threaded)",
+  suggest_exec_sponsor: "Sugerir exec sponsor (riesgo de presupuesto)",
+  trigger_rescue_playbook: "Disparar playbook de rescate (silencio)",
+  move_to_high_value_nurture: "Mover a nurture de alto valor (ICP alto)",
+  follow_up_overdue: "Follow-up vencido",
+  escalate_to_manager: "Escalado a manager",
+};

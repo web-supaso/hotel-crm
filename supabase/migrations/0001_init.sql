@@ -53,6 +53,7 @@ create table public.score_snapshots (
   lead_id uuid not null references public.leads (id) on delete cascade,
   classification public.lead_status not null,
   overall_score integer not null check (overall_score between 0 and 100),
+  trajectory_trend text,
   dimension_scores jsonb not null,          -- {intent, engagement, icp_fit, committee}
   risk_penalty integer not null default 0,
   confidence integer check (confidence between 0 and 100),
@@ -60,13 +61,17 @@ create table public.score_snapshots (
   estimated_close_days integer,
   estimated_deal_value_signal text,
   priority_level text,
+  pre_call_briefing text,
   next_best_action text,
   follow_up_days integer,
+  objection_risk text,
   reasoning text,
   key_signals text[] default '{}',
   data_gaps text[] default '{}',
   escalate_to_manager boolean not null default false,
+  active_learning_note text,
   ground_truth boolean,               -- true=cerrado ganado, false=perdido (lo marca el vendedor)
+  rep_feedback text,
   model text,
   prompt_version text,
   created_at timestamptz not null default now()

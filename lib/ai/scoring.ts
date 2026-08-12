@@ -4,6 +4,7 @@ import type { DimensionScores, LeadStatus } from "@/lib/types";
 export interface ScoringResult {
   classification: LeadStatus;
   overall_score: number;
+  trajectory_trend: "improving" | "declining" | "stable" | "new";
   dimension_scores: DimensionScores;
   risk_penalty: number;
   confidence: number;
@@ -11,12 +12,15 @@ export interface ScoringResult {
   estimated_close_days: number | null;
   estimated_deal_value_signal: string;
   priority_level: string;
+  pre_call_briefing: string;
   next_best_action: string;
   follow_up_days: number;
+  objection_risk: string;
   reasoning: string;
   key_signals: string[];
   data_gaps: string[];
   escalate_to_manager: boolean;
+  active_learning_note: string | null;
   model: string;
   prompt_version: string;
 }
@@ -83,6 +87,11 @@ function normalizeResult(text: string): ScoringResult {
   return {
     classification,
     overall_score: numeric(parsed.overall_score),
+    trajectory_trend: (["improving", "declining", "stable", "new"] as const).includes(
+      parsed.trajectory_trend,
+    )
+      ? (parsed.trajectory_trend as ScoringResult["trajectory_trend"])
+      : "new",
     dimension_scores: {
       intent: numeric(d.intent),
       engagement: numeric(d.engagement),
@@ -96,14 +105,21 @@ function normalizeResult(text: string): ScoringResult {
       parsed.estimated_close_days == null ? null : numeric(parsed.estimated_close_days),
     estimated_deal_value_signal: parsed.estimated_deal_value_signal ?? "unknown",
     priority_level: parsed.priority_level ?? "medium",
+    pre_call_briefing: parsed.pre_call_briefing ?? "",
     next_best_action: parsed.next_best_action ?? "",
     follow_up_days: numeric(parsed.follow_up_days),
+    objection_risk: ["none", "budget", "competitor", "silence", "timing"].includes(
+      parsed.objection_risk,
+    )
+      ? parsed.objection_risk
+      : "none",
     reasoning: parsed.reasoning ?? "",
     key_signals: Array.isArray(parsed.key_signals)
       ? parsed.key_signals.slice(0, 4).map(String)
       : [],
     data_gaps: Array.isArray(parsed.data_gaps) ? parsed.data_gaps.slice(0, 3).map(String) : [],
     escalate_to_manager: Boolean(parsed.escalate_to_manager),
+    active_learning_note: parsed.active_learning_note ?? null,
     model: MODEL,
     prompt_version: PROMPT_VERSION,
   };

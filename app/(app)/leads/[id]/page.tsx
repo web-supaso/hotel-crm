@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/labels";
-import { Card, StatusBadge, ScoreRing, PriorityBadge } from "@/components/ui";
+import {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+} from "@/lib/labels";
+import { deriveAutomationTriggers } from "@/lib/revenue";
+import { Card, StatusBadge, ScoreRing, PriorityBadge, TrajectoryBadge } from "@/components/ui";
 import type { Interaction, ScoreSnapshot } from "@/lib/types";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import ScoreAction from "./components/score-action";
 import InteractionList from "./components/interaction-list";
 import CloseButtons from "./components/close-buttons";
 import { DimensionScore } from "./components/dimension-scores";
+import RepFeedback from "./components/rep-feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +93,9 @@ export default async function LeadDetailPage({
                   )}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
+                  {score.trajectory_trend && (
+                    <TrajectoryBadge trend={score.trajectory_trend} />
+                  )}{" "}
                   Confianza: {score.confidence ?? "—"}% · Modelo: {score.model}
                 </p>
               </div>
@@ -171,6 +180,56 @@ export default async function LeadDetailPage({
               {score.reasoning ?? "—"}
             </p>
           </div>
+
+          {score.pre_call_briefing && (
+            <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                Briefing pre-llamada
+              </p>
+              <p className="mt-1 text-sm text-slate-700">{score.pre_call_briefing}</p>
+            </div>
+          )}
+
+          {score.objection_risk && score.objection_risk !== "none" && (
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+              <AlertTriangle size={13} />
+              Riesgo: {score.objection_risk}
+            </div>
+          )}
+
+          {score.active_learning_note && (
+            <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50/60 p-3">
+              <p className="text-xs text-amber-800">
+                <span className="font-semibold">Nota de calibración: </span>
+                {score.active_learning_note}
+              </p>
+            </div>
+          )}
+
+          {(() => {
+            const leadWithScore = lead ? { ...lead, latest_score: score } : null;
+            const triggers = deriveAutomationTriggers(leadWithScore, score);
+            if (triggers.length === 0) return null;
+            return (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Automatizaciones disparadas
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {triggers.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                    >
+                      ⚡ {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <RepFeedback leadId={lead.id} snapshotId={score?.id} />
         </Card>
       ) : (
         <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">

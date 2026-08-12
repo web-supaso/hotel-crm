@@ -56,6 +56,7 @@ export interface ScoreSnapshot {
   lead_id: string;
   classification: LeadStatus;
   overall_score: number;
+  trajectory_trend: "improving" | "declining" | "stable" | "new" | null;
   dimension_scores: DimensionScores;
   risk_penalty: number;
   confidence: number | null;
@@ -63,16 +64,25 @@ export interface ScoreSnapshot {
   estimated_close_days: number | null;
   estimated_deal_value_signal: string | null;
   priority_level: string | null;
+  pre_call_briefing: string | null;
   next_best_action: string | null;
   follow_up_days: number | null;
+  objection_risk: string | null;
   reasoning: string | null;
   key_signals: string[];
   data_gaps: string[];
   escalate_to_manager: boolean;
+  active_learning_note: string | null;
   ground_truth: boolean | null;
   model: string | null;
   prompt_version: string | null;
   created_at: string;
+}
+
+export interface RepFeedbackDraft {
+  snapshot_id: string;
+  lead_id: string;
+  feedback: string;
 }
 
 export interface LeadWithStats extends Lead {

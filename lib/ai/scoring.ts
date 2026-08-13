@@ -1,40 +1,37 @@
-import { PROMPT_VERSION, buildLeadScoringPrompt, type Instruction } from "./prompt";
-import type { DimensionScores, LeadStatus } from "@/lib/types";
+import { PROMPT_VERSION, buildHospitalityLeadPrompt, type HospitalityLeadPromptInput } from "./prompt";
 
-export interface ScoringResult {
-  classification: LeadStatus;
-  overall_score: number;
-  trajectory_trend: "improving" | "declining" | "stable" | "new";
-  dimension_scores: DimensionScores;
-  risk_penalty: number;
-  confidence: number;
-  predicted_close_probability: number;
-  estimated_close_days: number | null;
-  estimated_deal_value_signal: string;
-  priority_level: string;
-  pre_call_briefing: string;
-  next_best_action: string;
-  follow_up_days: number;
-  objection_risk: string;
-  reasoning: string;
+export interface HospitalityAnalysisResult {
+  intent_score: number;
+  urgency: "alta" | "media" | "baja";
+  summary: string;
+  suggested_whatsapp_reply: string;
   key_signals: string[];
-  data_gaps: string[];
-  escalate_to_manager: boolean;
-  active_learning_note: string | null;
+  risk_factors: string[];
+  next_action: string;
   model: string;
   prompt_version: string;
 }
 
-// Gemini REST API: no SDK necesario para mantener el stack mínimo.
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
 
-export async function scoreLead(data: Instruction): Promise<ScoringResult> {
+export async function analyzeHospitalityLead(data: HospitalityLeadPromptInput): Promise<HospitalityAnalysisResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY no configurada");
+    // Fallback si no hay API key configurada (para pruebas locales)
+    return {
+      intent_score: 75,
+      urgency: "media",
+      summary: `Solicitud de ${data.guestName} para ${data.propertyName ?? "alojamiento"} (${data.guestsCount} pers).`,
+      suggested_whatsapp_reply: `¡Hola ${data.guestName}! Gracias por consultarnos para tu estadía del ${data.requestedCheckIn ?? "próximamente"} al ${data.requestedCheckOut ?? ""}. Tenemos disponibilidad en ${data.propertyName ?? "nuestras instalaciones"}. ¿Te gustaría que te prepare la cotización con el detalle?`,
+      key_signals: ["fechas_solicitadas", "whatsapp_directo"],
+      risk_factors: [],
+      next_action: "Enviar cotización formal por WhatsApp",
+      model: "mock-fallback",
+      prompt_version: PROMPT_VERSION,
+    };
   }
 
-  const prompt = buildLeadScoringPrompt(data);
+  const prompt = buildHospitalityLeadPrompt(data);
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
@@ -44,7 +41,7 @@ export async function scoreLead(data: Instruction): Promise<ScoringResult> {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.1,
+          temperature: 0.2,
           responseMimeType: "application/json",
         },
       }),
@@ -57,69 +54,23 @@ export async function scoreLead(data: Instruction): Promise<ScoringResult> {
   }
 
   const json = await res.json();
-  const text: string | undefined =
-    json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) {
     throw new Error("Gemini no devolvió texto");
   }
 
-  return normalizeResult(text);
-}
-
-function normalizeResult(text: string): ScoringResult {
   const cleaned = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   const parsed = JSON.parse(cleaned);
 
-  const numeric = (v: unknown): number => {
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
-  };
-
-  const classification = (["hot", "warm", "cold", "unknown"] as const).includes(
-    parsed.classification,
-  )
-    ? (parsed.classification as LeadStatus)
-    : "unknown";
-
-  const d = parsed.dimension_scores ?? {};
-
   return {
-    classification,
-    overall_score: numeric(parsed.overall_score),
-    trajectory_trend: (["improving", "declining", "stable", "new"] as const).includes(
-      parsed.trajectory_trend,
-    )
-      ? (parsed.trajectory_trend as ScoringResult["trajectory_trend"])
-      : "new",
-    dimension_scores: {
-      intent: numeric(d.intent),
-      engagement: numeric(d.engagement),
-      icp_fit: numeric(d.icp_fit),
-      committee: numeric(d.committee),
-    },
-    risk_penalty: Math.max(0, Math.min(50, Math.abs(numeric(parsed.risk_penalty)))) * -1,
-    confidence: numeric(parsed.confidence),
-    predicted_close_probability: numeric(parsed.predicted_close_probability),
-    estimated_close_days:
-      parsed.estimated_close_days == null ? null : numeric(parsed.estimated_close_days),
-    estimated_deal_value_signal: parsed.estimated_deal_value_signal ?? "unknown",
-    priority_level: parsed.priority_level ?? "medium",
-    pre_call_briefing: parsed.pre_call_briefing ?? "",
-    next_best_action: parsed.next_best_action ?? "",
-    follow_up_days: numeric(parsed.follow_up_days),
-    objection_risk: ["none", "budget", "competitor", "silence", "timing"].includes(
-      parsed.objection_risk,
-    )
-      ? parsed.objection_risk
-      : "none",
-    reasoning: parsed.reasoning ?? "",
-    key_signals: Array.isArray(parsed.key_signals)
-      ? parsed.key_signals.slice(0, 4).map(String)
-      : [],
-    data_gaps: Array.isArray(parsed.data_gaps) ? parsed.data_gaps.slice(0, 3).map(String) : [],
-    escalate_to_manager: Boolean(parsed.escalate_to_manager),
-    active_learning_note: parsed.active_learning_note ?? null,
+    intent_score: Math.max(0, Math.min(100, Math.round(Number(parsed.intent_score) || 50))),
+    urgency: (["alta", "media", "baja"] as const).includes(parsed.urgency) ? parsed.urgency : "media",
+    summary: String(parsed.summary || "Solicitud de reserva"),
+    suggested_whatsapp_reply: String(parsed.suggested_whatsapp_reply || ""),
+    key_signals: Array.isArray(parsed.key_signals) ? parsed.key_signals.map(String) : [],
+    risk_factors: Array.isArray(parsed.risk_factors) ? parsed.risk_factors.map(String) : [],
+    next_action: String(parsed.next_action || "Contactar al huésped"),
     model: MODEL,
     prompt_version: PROMPT_VERSION,
   };

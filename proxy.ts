@@ -6,6 +6,13 @@ export async function proxy(request: NextRequest) {
     request: { headers: request.headers },
   });
 
+  const { pathname } = request.nextUrl;
+
+  // Rutas públicas que no requieren sesión de usuario (webhooks y cron)
+  if (pathname.startsWith("/api/inbound") || pathname.startsWith("/api/cron")) {
+    return response;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,9 +36,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  // API: requiere sesión autenticada (los route handlers usan service role).
+  // API protegida: requiere sesión autenticada si no es webhook público
   if (pathname.startsWith("/api")) {
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -39,7 +44,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Protege las rutas de la app
+  // Protege las páginas de la app redirigiendo a /login
   if (!user && pathname !== "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

@@ -1,99 +1,9 @@
-import { STATUS_COLOR, PRIORITY_COLOR } from "@/lib/revenue";
-import type { LeadStatus } from "@/lib/types";
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { LeadStatus, ReservationStatus } from "@/lib/types";
 
-const TREND_COLOR: Record<string, string> = {
-  improving: "bg-emerald-100 text-emerald-700",
-  declining: "bg-rose-100 text-rose-700",
-  stable: "bg-slate-100 text-slate-600",
-  new: "bg-indigo-100 text-indigo-700",
-};
-
-const TREND_LABELS: Record<string, string> = {
-  improving: "↑ Mejorando",
-  declining: "↓ Declinando",
-  stable: "= Estable",
-  new: "● Nuevo",
-};
-
-export function TrajectoryBadge({ trend }: { trend: string | null }) {
-  if (!trend || !TREND_COLOR[trend]) return null;
+export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${TREND_COLOR[trend]}`}
-    >
-      {TREND_LABELS[trend]}
-    </span>
-  );
-}
-
-export function StatusBadge({ status }: { status: LeadStatus }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_COLOR[status] ?? "bg-zinc-100 text-zinc-500"}`}
-    >
-      {status === "closed_won" ? "Ganado" : status === "closed_lost" ? "Perdido" : status}
-    </span>
-  );
-}
-
-export function PriorityBadge({ priority }: { priority: string | null }) {
-  if (!priority) return null;
-  const labels: Record<string, string> = {
-    urgent: "Urgente",
-    high: "Alta",
-    medium: "Media",
-    low: "Baja",
-    nurture: "Nurture",
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_COLOR[priority] ?? "bg-slate-400 text-white"}`}
-    >
-      {labels[priority] ?? priority}
-    </span>
-  );
-}
-
-export function ScoreRing({ score, size = 64 }: { score: number; size?: number }) {
-  const isValid = Number.isFinite(score) && score >= 0;
-  const color =
-    score >= 75 ? "#dc2626" : score >= 45 ? "#d97706" : "#64748b";
-
-  return (
-    <div
-      className="relative flex items-center justify-center"
-      style={{ width: size, height: size }}
-    >
-      <svg width={size} height={size} viewBox="0 0 36 36" className="-rotate-90">
-        <circle
-          cx="18"
-          cy="18"
-          r="15.5"
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth="3.5"
-        />
-        <circle
-          cx="18"
-          cy="18"
-          r="15.5"
-          fill="none"
-          stroke={color}
-          strokeWidth="3.5"
-          strokeDasharray={`${isValid ? score * 0.873 : 0} 100`}
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="absolute text-sm font-bold" style={{ color }}>
-        {isValid ? score : "—"}
-      </span>
-    </div>
-  );
-}
-
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -101,82 +11,135 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
 
 export function Button({
   children,
-  onClick,
-  variant = "primary",
-  disabled,
   className = "",
-  type = "button",
-  title,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  variant?: "primary" | "secondary" | "danger" | "ghost";
-  disabled?: boolean;
-  className?: string;
-  type?: "button" | "submit";
-  title?: string;
-}) {
-  const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
-  const variants = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-500",
-    secondary: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-    danger: "bg-rose-600 text-white hover:bg-rose-500",
+  variant = "primary",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
+  const styles = {
+    primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
+    secondary: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50",
+    danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
     ghost: "text-slate-600 hover:bg-slate-100",
   };
+
   return (
     <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`${base} ${variants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-bold transition-all disabled:opacity-50 ${styles[variant]} ${className}`}
+      {...props}
     >
       {children}
     </button>
   );
 }
 
-export function Input({
-  className = "",
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
+      className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
       {...props}
     />
   );
 }
 
-export function Select({
-  className = "",
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className = "", children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
+      className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
       {...props}
-    />
+    >
+      {children}
+    </select>
   );
 }
 
-export function Textarea({
-  className = "",
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
+      className={`w-full rounded-xl border border-slate-300 bg-white p-3 text-xs text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${className}`}
       {...props}
     />
   );
 }
 
-export function EmptyState({ message }: { message: string }) {
+export function StatusBadge({ status }: { status: LeadStatus | ReservationStatus | string }) {
+  const styles: Record<string, string> = {
+    nuevo: "bg-blue-100 text-blue-700",
+    contactado: "bg-amber-100 text-amber-800",
+    propuesta_enviada: "bg-purple-100 text-purple-700",
+    negociacion: "bg-indigo-100 text-indigo-700",
+    convertido: "bg-emerald-100 text-emerald-800",
+    descartado: "bg-slate-100 text-slate-600",
+    pendiente_pago: "bg-amber-100 text-amber-800",
+    senada: "bg-indigo-100 text-indigo-700",
+    confirmada: "bg-emerald-100 text-emerald-800",
+    in_house: "bg-purple-100 text-purple-700",
+    checkout: "bg-blue-100 text-blue-700",
+    completada: "bg-slate-100 text-slate-700",
+    cancelada: "bg-rose-100 text-rose-700",
+  };
+
+  const label = status ? status.replace("_", " ").toUpperCase() : "DESCONOCIDO";
+  const color = styles[status] || "bg-slate-100 text-slate-700";
+
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/60 py-16 text-center">
-      <p className="text-sm text-slate-500">{message}</p>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>
+      {label}
+    </span>
+  );
+}
+
+export function PriorityBadge({ priority }: { priority: string | null }) {
+  const p = priority || "normal";
+  return (
+    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">
+      {p}
+    </span>
+  );
+}
+
+export function TrajectoryBadge({ trend }: { trend: string | null }) {
+  return (
+    <span className="text-[10px] font-bold text-slate-500">
+      {trend || "estable"}
+    </span>
+  );
+}
+
+export function ScoreRing({ score, size = 48 }: { score: number; size?: number }) {
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.max(0, Math.min(100, score));
+  const offset = circumference - (progress / 100) * circumference;
+
+  let color = "text-emerald-500";
+  if (score < 40) color = "text-rose-500";
+  else if (score < 70) color = "text-amber-500";
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-slate-100 fill-none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={`${color} fill-none transition-all duration-500`}
+        />
+      </svg>
+      <span className="absolute text-xs font-black text-slate-800">{score}</span>
     </div>
   );
 }

@@ -9,3 +9,5 @@ export function createAdminClient() {
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }
+
+export const getAdminClient = createAdminClient;

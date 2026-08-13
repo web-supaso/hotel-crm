@@ -1,69 +1,45 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { INTERACTION_TYPES, INTERACTION_DIRECTIONS } from "@/lib/labels";
+import { getAdminClient } from "@/lib/supabase/admin";
 
-// POST /api/leads/:id/interactions
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const supabase = createAdminClient();
-  const body = await req.json();
+  try {
+    const { id: leadId } = await params;
+    const supabase = getAdminClient();
+    const body = await req.json();
 
-  const type = body.type ?? "call";
-  const direction = body.direction ?? "outbound";
+    const { type = "note", summary } = body;
 
-  if (!INTERACTION_TYPES.includes(type)) {
-    return NextResponse.json({ error: "tipo de interacción inválido" }, { status: 400 });
+    if (!summary?.trim()) {
+      return NextResponse.json({ error: "El resumen de la nota es obligatorio" }, { status: 400 });
+    }
+
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("organization_id")
+      .eq("id", leadId)
+      .single();
+
+    if (leadErr || !lead) {
+      return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
+    }
+
+    const { data: interaction, error } = await supabase
+      .from("interactions")
+      .insert({
+        organization_id: lead.organization_id,
+        lead_id: leadId,
+        type: type,
+        summary: summary.trim(),
+      })
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(interaction, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-  if (!INTERACTION_DIRECTIONS.includes(direction)) {
-    return NextResponse.json({ error: "dirección inválida" }, { status: 400 });
-  }
-
-  const occurred_at =
-    body.occurred_at && !isNaN(new Date(body.occurred_at).getTime())
-      ? new Date(body.occurred_at).toISOString()
-      : new Date().toISOString();
-
-  const { data: interaction, error } = await supabase
-    .from("interactions")
-    .insert({
-      lead_id: id,
-      type,
-      direction,
-      summary: body.summary ?? null,
-      contact_name: body.contact_name ?? null,
-      contact_role: body.contact_role ?? null,
-      occurred_at,
-    })
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(interaction, { status: 201 });
-}
-
-// DELETE /api/leads/:id/interactions?interaction_id=...
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  const url = new URL(req.url);
-  const interactionId = url.searchParams.get("interaction_id");
-
-  if (!interactionId) {
-    return NextResponse.json({ error: "interaction_id requerido" }, { status: 400 });
-  }
-
-  const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("interactions")
-    .delete()
-    .eq("id", interactionId)
-    .eq("lead_id", id);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
 }

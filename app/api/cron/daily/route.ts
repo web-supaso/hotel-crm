@@ -1,153 +1,25 @@
-import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { scoreLead } from "@/lib/ai/scoring";
-import { daysSince } from "@/lib/revenue";
-import type { Interaction, Lead } from "@/lib/types";
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 
-export const maxDuration = 300;
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = getAdminClient();
 
-interface SnapRow {
-  lead_id: string;
-  created_at: string;
-  estimated_close_days: number | null;
-  overall_score: number | null;
-  ground_truth: boolean | null;
-  rep_feedback: string | null;
-}
+    // 1. Marcar automáticamente como checkout las reservas in_house cuya fecha de salida ya pasó
+    const today = new Date().toISOString().split("T")[0];
+    const { data: expiredInHouse, error: expErr } = await supabase
+      .from("reservations")
+      .update({ status: "checkout", updated_at: new Date().toISOString() })
+      .eq("status", "in_house")
+      .lt("check_out_date", today)
+      .select("id, reservation_code");
 
-// POST /api/cron/daily — llamado por Vercel Cron (o un cron externo).
-// 1) Puntúa leads sin score o con interacciones posteriores al último score.
-// 2) Detecta deals bloqueados (estimated_close_days vencido).
-export async function POST() {
-  const supabase = createAdminClient();
-  const results = { scored: 0, errors: 0, stuck: [] as string[] };
-
-  const { data: leads } = await supabase
-    .from("leads")
-    .select("*")
-    .in("status", ["hot", "warm", "cold", "unknown"]);
-
-  const ids = (leads ?? []).map((l: Lead) => l.id);
-  if (!ids.length) {
-    return NextResponse.json(results);
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      checkouts_processed: expiredInHouse?.length || 0,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  const [{ data: interactions }, { data: snapshots }] = await Promise.all([
-    supabase
-      .from("interactions")
-      .select("lead_id, type, direction, summary, contact_name, contact_role, occurred_at")
-      .in("lead_id", ids),
-    supabase
-      .from("score_snapshots")
-      .select("lead_id, created_at, estimated_close_days, overall_score, ground_truth, rep_feedback")
-      .in("lead_id", ids),
-  ]);
-
-  const latestSnap = new Map<string, SnapRow>();
-  for (const s of (snapshots ?? []) as SnapRow[]) {
-    const prev = latestSnap.get(s.lead_id);
-    if (!prev || new Date(s.created_at) > new Date(prev.created_at)) {
-      latestSnap.set(s.lead_id, s);
-    }
-  }
-
-  const interactionRows = (interactions ?? []) as Interaction[];
-
-  for (const lead of leads as Lead[]) {
-    const leadInteractions = interactionRows.filter((i) => i.lead_id === lead.id);
-
-const latest = latestSnap.get(lead.id);
-        const needsRescore =
-          !latest ||
-          leadInteractions.some((i: Interaction) => new Date(i.occurred_at) > new Date(latest.created_at));
-
-        if (needsRescore) {
-          try {
-            const list = leadInteractions
-              .sort((a: Interaction, b: Interaction) =>
-                new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
-              )
-              .slice(0, 10);
-
-            const stakeholders = new Set(
-              list.map((i: Interaction) => i.contact_name?.trim()).filter(Boolean),
-            );
-
-            const prevOutcome = latest?.ground_truth == null
-              ? null
-              : latest.ground_truth ? "won" : "lost";
-
-            const result = await scoreLead({
-              name: lead.name,
-              company: lead.company,
-              segment: lead.company_segment,
-              companySize: lead.company_size,
-              dealValue: lead.deal_value_estimate,
-              lastInteractionDate: list[0]?.occurred_at ?? null,
-              count: list.length,
-              stakeholdersCount: stakeholders.size,
-              daysInPipeline: daysSince(lead.created_at),
-              previousOverallScore: latest?.overall_score ?? null,
-              previousPredictionOutcome: prevOutcome,
-              repFeedback: latest?.rep_feedback ?? null,
-              interactions: list.map((i: Interaction) => ({
-                type: i.type,
-                direction: i.direction,
-                summary: i.summary,
-                contactName: i.contact_name,
-                contactRole: i.contact_role,
-                occurredAt: i.occurred_at,
-              })),
-            });
-
-            await supabase.from("score_snapshots").insert({
-              lead_id: lead.id,
-              classification: result.classification,
-              overall_score: result.overall_score,
-              trajectory_trend: result.trajectory_trend,
-              dimension_scores: result.dimension_scores,
-              risk_penalty: result.risk_penalty,
-              confidence: result.confidence,
-              predicted_close_probability: result.predicted_close_probability,
-              estimated_close_days: result.estimated_close_days,
-              estimated_deal_value_signal: result.estimated_deal_value_signal,
-              priority_level: result.priority_level,
-              pre_call_briefing: result.pre_call_briefing,
-              next_best_action: result.next_best_action,
-              follow_up_days: result.follow_up_days,
-              objection_risk: result.objection_risk,
-              reasoning: result.reasoning,
-              key_signals: result.key_signals,
-              data_gaps: result.data_gaps,
-              escalate_to_manager: result.escalate_to_manager,
-              active_learning_note: result.active_learning_note,
-              model: result.model,
-              prompt_version: result.prompt_version,
-            });
-
-        await supabase
-          .from("leads")
-          .update({ status: result.classification })
-          .eq("id", lead.id)
-          .in("status", ["hot", "warm", "cold", "unknown"]);
-
-        results.scored++;
-      } catch (e) {
-        results.errors++;
-        console.error(`Scoring falló para lead ${lead.id}:`, e);
-      }
-    }
-
-    // Deals bloqueados: fecha estimada ya vencida
-    const snap = latestSnap.get(lead.id);
-    if (snap?.estimated_close_days) {
-      const due = new Date(snap.created_at);
-      due.setDate(due.getDate() + snap.estimated_close_days);
-      if (due < new Date()) {
-        results.stuck.push(lead.name);
-      }
-    }
-  }
-
-  return NextResponse.json(results);
 }

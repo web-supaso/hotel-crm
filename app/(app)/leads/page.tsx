@@ -279,156 +279,226 @@ export default function LeadsPipelinePage() {
             const isOccasion = requests.includes("Ocasión:") ? requests.split("Ocasión:")[1].split("|")[0].trim() : null;
             const isMsg = requests.includes("Mensaje:") ? requests.split("Mensaje:")[1].trim() : null;
             const hasBreakdown = requests.includes("Desglose:") ? requests.split("Desglose:")[1].split("|")[0].trim() : null;
+            const todayStr = new Date().toISOString().split("T")[0];
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+            const isCheckInToday = lead.requested_check_in === todayStr;
+            const isCheckInTomorrow = lead.requested_check_in === tomorrowStr;
             const nights = calculateNights(lead.requested_check_in, lead.requested_check_out);
 
             return (
               <div
                 key={lead.id}
-                className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+                className={`flex flex-col gap-3 rounded-2xl p-5 shadow-sm transition-all ${
+                  isCheckInToday
+                    ? "border-2 border-red-500 bg-red-50/15 shadow-red-100 ring-2 ring-red-400/30"
+                    : isCheckInTomorrow
+                    ? "border-amber-300 bg-amber-50/15 shadow-sm"
+                    : "border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
+                }`}
               >
-                {/* Columna Principal: Datos del Huésped */}
-                <div className="space-y-2 min-w-[300px] flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-black text-slate-900 text-base">{lead.guest_name}</h3>
-                    {getStatusBadge(lead.status)}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
-                    <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg">{lead.guest_phone}</span>
-                    {lead.guest_email && <span className="text-slate-500">{lead.guest_email}</span>}
-                    {lead.property && (
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700">
-                        <Building2 size={12} /> {lead.property.name}
+                {/* Emergency Top Banner for Today Check-In */}
+                {isCheckInToday && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-600 px-3.5 py-1.5 text-xs font-black text-white shadow-sm animate-pulse">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-80"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
                       </span>
-                    )}
-                  </div>
-
-                  {/* Fechas con Cantidad de Noches Calculadas & Desglose */}
-                  <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-semibold text-slate-700">
-                    <span className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60 text-amber-900">
-                      <Calendar size={13} className="text-amber-700" />
-                      {lead.requested_check_in ? (
-                        <>
-                          {lead.requested_check_in} al {lead.requested_check_out || '?'}
-                          {nights > 0 && (
-                            <span className="font-black text-amber-700 text-[11px]">
-                              ({nights} {nights === 1 ? "noche" : "noches"})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        "Fechas a definir"
-                      )}
+                      <span>🚨 ¡CHECK-IN HOY! RESPONDER YA (Viajero en camino • Máxima Prioridad de Cierre)</span>
+                    </div>
+                    <span className="bg-black/25 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider">
+                      Urgencia Inmediata
                     </span>
-
-                    <span className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg text-slate-800">
-                      <Users size={13} className="text-slate-500" />
-                      {hasBreakdown || `${lead.guests_count} personas`}
-                    </span>
-
-                    {lead.pets_count > 0 && (
-                      <span className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200">
-                        <Dog size={13} /> {lead.pets_count} mascota(s)
-                      </span>
-                    )}
-
-                    {lead.dietary_notes && (
-                      <span className="flex items-center gap-1 bg-purple-50 text-purple-800 px-2.5 py-1 rounded-lg border border-purple-200">
-                        <Utensils size={13} /> {lead.dietary_notes}
-                      </span>
-                    )}
                   </div>
+                )}
 
-                  {/* Ocasión Especial y Mensaje del Cliente */}
-                  {(isOccasion || isMsg || (!hasBreakdown && requests)) && (
-                    <div className="space-y-1 pt-1">
-                      {isOccasion && (
-                        <div className="inline-flex items-center gap-1.5 rounded-lg bg-pink-50 px-2.5 py-1 text-xs font-bold text-pink-800 border border-pink-200/60 mr-2">
-                          <Heart size={12} className="text-pink-600" /> Ocasión: {isOccasion}
-                        </div>
-                      )}
-                      {isMsg && (
-                        <div className="flex items-start gap-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200 mt-1">
-                          <MessageSquare size={13} className="text-slate-400 mt-0.5 shrink-0" />
-                          <p className="italic font-medium">"{isMsg}"</p>
-                        </div>
-                      )}
-                      {!isOccasion && !isMsg && requests && !requests.startsWith("Desglose:") && (
-                        <p className="text-xs text-slate-600 italic bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          {requests}
-                        </p>
+                {isCheckInTomorrow && !isCheckInToday && (
+                  <div className="flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                    <span>⚡ ¡CHECK-IN MAÑANA! — Atender a la brevedad para asegurar la reserva</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                  {/* Columna Principal: Datos del Huésped */}
+                  <div className="space-y-2 min-w-[300px] flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-slate-900 text-base">{lead.guest_name}</h3>
+                      {getStatusBadge(lead.status)}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
+                      <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg">{lead.guest_phone}</span>
+                      {lead.guest_email && <span className="text-slate-500">{lead.guest_email}</span>}
+                      {lead.property && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700">
+                          <Building2 size={12} /> {lead.property.name}
+                        </span>
                       )}
                     </div>
-                  )}
-                </div>
 
-                {/* Columna Inteligencia IA (Gemini) */}
-                <div className="flex-1 rounded-2xl bg-slate-50/80 p-3.5 border border-slate-200/70 max-w-md">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1">
-                    <span className="flex items-center gap-1 text-indigo-700">
-                      <Sparkles size={13} /> Diagnóstico IA: {lead.ai_urgency ? `Urgencia ${lead.ai_urgency.toUpperCase()}` : "Normal"}
-                    </span>
-                    {lead.ai_intent_score && (
-                      <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] font-black">
-                        Score: {lead.ai_intent_score}/100
+                    {/* Fechas con Cantidad de Noches Calculadas & Desglose */}
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-semibold text-slate-700">
+                      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+                        isCheckInToday
+                          ? "bg-red-100/90 text-red-900 border-red-300 font-black"
+                          : isCheckInTomorrow
+                          ? "bg-amber-100 text-amber-900 border-amber-300 font-black"
+                          : "bg-amber-50 text-amber-900 border-amber-200/60"
+                      }`}>
+                        <Calendar size={13} className={isCheckInToday ? "text-red-700" : "text-amber-700"} />
+                        {lead.requested_check_in ? (
+                          <>
+                            {lead.requested_check_in} al {lead.requested_check_out || '?'}
+                            {nights > 0 && (
+                              <span className={`text-[11px] font-black ${isCheckInToday ? "text-red-800" : "text-amber-700"}`}>
+                                ({nights} {nights === 1 ? "noche" : "noches"})
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          "Fechas a definir"
+                        )}
+                      </span>
+
+                      <span className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg text-slate-800">
+                        <Users size={13} className="text-slate-500" />
+                        {hasBreakdown || `${lead.guests_count} personas`}
+                      </span>
+
+                      {lead.pets_count > 0 && (
+                        <span className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200">
+                          <Dog size={13} /> {lead.pets_count} mascota(s)
+                        </span>
+                      )}
+
+                      {lead.dietary_notes && (
+                        <span className="flex items-center gap-1 bg-purple-50 text-purple-800 px-2.5 py-1 rounded-lg border border-purple-200">
+                          <Utensils size={13} /> {lead.dietary_notes}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Ocasión Especial y Mensaje del Cliente */}
+                    {(isOccasion || isMsg || (!hasBreakdown && requests)) && (
+                      <div className="space-y-1 pt-1">
+                        {isOccasion && (
+                          <div className="inline-flex items-center gap-1.5 rounded-lg bg-pink-50 px-2.5 py-1 text-xs font-bold text-pink-800 border border-pink-200/60 mr-2">
+                            <Heart size={12} className="text-pink-600" /> Ocasión: {isOccasion}
+                          </div>
+                        )}
+                        {isMsg && (
+                          <div className="flex items-start gap-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200 mt-1">
+                            <MessageSquare size={13} className="text-slate-400 mt-0.5 shrink-0" />
+                            <p className="italic font-medium">"{isMsg}"</p>
+                          </div>
+                        )}
+                        {!isOccasion && !isMsg && requests && !requests.startsWith("Desglose:") && (
+                          <p className="text-xs text-slate-600 italic bg-slate-50 p-2 rounded-lg border border-slate-200">
+                            {requests}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Columna Inteligencia IA (Gemini) */}
+                  <div className={`flex-1 rounded-2xl p-3.5 border max-w-md ${
+                    isCheckInToday
+                      ? "bg-red-50/80 border-red-200"
+                      : "bg-slate-50/80 border-slate-200/70"
+                  }`}>
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1">
+                      <span className={`flex items-center gap-1 ${isCheckInToday ? "text-red-700 font-black" : "text-indigo-700"}`}>
+                        <Sparkles size={13} />
+                        Diagnóstico IA: {
+                          isCheckInToday
+                            ? "URGENCIA ALTA (ENTRA HOY)"
+                            : isCheckInTomorrow
+                            ? "URGENCIA ALTA (ENTRA MAÑANA)"
+                            : lead.ai_urgency
+                            ? `Urgencia ${lead.ai_urgency.toUpperCase()}`
+                            : "Normal"
+                        }
+                      </span>
+                      {lead.ai_intent_score ? (
+                        <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] font-black">
+                          Score: {lead.ai_intent_score}/100
+                        </span>
+                      ) : isCheckInToday ? (
+                        <span className="bg-red-200 text-red-900 px-2 py-0.5 rounded-full text-[10px] font-black">
+                          Score: 95/100
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className={`text-xs leading-relaxed ${isCheckInToday ? "text-red-900 font-medium" : "text-slate-700"}`}>
+                      {lead.ai_summary || (
+                        isCheckInToday
+                          ? "Huésped solicita ingreso para hoy. Responder inmediatamente por WhatsApp antes de que reserve otra opción."
+                          : isCheckInTomorrow
+                          ? "Huésped solicita ingreso para mañana. Alta probabilidad de cierre rápido."
+                          : "Diagnóstico generado automáticamente al ingresar consulta."
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Columna Acciones Rápidas */}
+                  <div className="flex items-center gap-2 shrink-0 self-center lg:self-start pt-1">
+                    {/* Botón WhatsApp Directo */}
+                    {formatWhatsAppNumber(lead.guest_phone) ? (
+                      <a
+                        href={getWhatsAppUrl(lead)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Abrir WhatsApp con ${lead.guest_name} (${lead.guest_phone})`}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white shadow-sm active:scale-95 transition-all ${
+                          isCheckInToday
+                            ? "bg-red-600 hover:bg-red-700 shadow-red-200 ring-2 ring-red-400"
+                            : "bg-emerald-600 hover:bg-emerald-700"
+                        }`}
+                      >
+                        <MessageCircle size={15} className="shrink-0" />
+                        <span>{isCheckInToday ? "Responder YA" : "WhatsApp"}</span>
+                      </a>
+                    ) : (
+                      <span
+                        title="Sin número de WhatsApp registrado"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed border border-slate-200"
+                      >
+                        <MessageCircle size={15} className="shrink-0" />
+                        <span>WhatsApp</span>
+                      </span>
+                    )}
+
+                    {/* Botón Convertir a Reserva */}
+                    {lead.status !== "convertido" && lead.status !== "descartado" && (
+                      <button
+                        onClick={() => setConvertLead(lead)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                      >
+                        <CreditCard size={15} /> Convertir
+                      </button>
+                    )}
+
+                    {/* Botón Descartar */}
+                    {lead.status !== "descartado" && lead.status !== "convertido" && (
+                      <button
+                        onClick={() => setDiscardLead({ id: lead.id, name: lead.guest_name })}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                        title="Descartar solicitud"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    )}
+
+                    {lead.status === "descartado" && lead.discard_reason && (
+                      <span className="text-[11px] text-rose-700 font-semibold bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                        Motivo: {lead.discard_reason.label}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    {lead.ai_summary || "Diagnóstico generado automáticamente al ingresar consulta."}
-                  </p>
-                </div>
-
-                {/* Columna Acciones Rápidas */}
-                <div className="flex items-center gap-2 shrink-0 self-center lg:self-start pt-1">
-                  {/* Botón WhatsApp Directo */}
-                  {formatWhatsAppNumber(lead.guest_phone) ? (
-                    <a
-                      href={getWhatsAppUrl(lead)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Abrir WhatsApp con ${lead.guest_name} (${lead.guest_phone})`}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"
-                    >
-                      <MessageCircle size={15} className="shrink-0" />
-                      <span>WhatsApp</span>
-                    </a>
-                  ) : (
-                    <span
-                      title="Sin número de WhatsApp registrado"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed border border-slate-200"
-                    >
-                      <MessageCircle size={15} className="shrink-0" />
-                      <span>WhatsApp</span>
-                    </span>
-                  )}
-
-                  {/* Botón Convertir a Reserva */}
-                  {lead.status !== "convertido" && lead.status !== "descartado" && (
-                    <button
-                      onClick={() => setConvertLead(lead)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-                    >
-                      <CreditCard size={15} /> Convertir
-                    </button>
-                  )}
-
-                  {/* Botón Descartar */}
-                  {lead.status !== "descartado" && lead.status !== "convertido" && (
-                    <button
-                      onClick={() => setDiscardLead({ id: lead.id, name: lead.guest_name })}
-                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-                      title="Descartar solicitud"
-                    >
-                      <XCircle size={16} />
-                    </button>
-                  )}
-
-                  {lead.status === "descartado" && lead.discard_reason && (
-                    <span className="text-[11px] text-rose-700 font-semibold bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
-                      Motivo: {lead.discard_reason.label}
-                    </span>
-                  )}
                 </div>
               </div>
             );

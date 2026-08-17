@@ -50,9 +50,23 @@ Supabase → Authentication → Users → Invite user → email tuyo + contrase�
 - Si algo falla con links de Supabase → usar `app.supabase.com` en incógnito.
 - Build local: usar `npx next build --webpack` (en tu Windows Turbopack falla por SWC; en Vercel no hay problema).
 
+## Supabase Keep-Alive (Prevención de Pausa a los 7 días)
+
+Supabase en su plan gratuito entra en pausa automática (*paused*) tras 7 días consecutivos sin actividad externa. Para evitarlo dejamos configuradas 3 capas de protección:
+
+1. **GitHub Actions (Recomendado & Automático)**:
+   - Archivo: `.github/workflows/supabase-keep-alive.yml`
+   - Se ejecuta cada 3 días (`0 6 */3 * *`), haciendo un ping REST directo a Supabase con tus secrets.
+   - Requiere tener cargados `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` en **GitHub → Settings → Secrets and variables → Actions**.
+2. **Endpoint Keep-Alive en Next.js**:
+   - Ruta: `/api/cron/keepalive` (y el cron diario de Vercel en `/api/cron/daily`).
+3. **Monitor Externo (Opcional)**:
+   - Puedes configurar un ping gratuito cada 4 o 5 días en [cron-job.org](https://cron-job.org) o [UptimeRobot](https://uptimerobot.com) apuntando a `https://<tu-app>.vercel.app/api/cron/keepalive` o directamente a tu endpoint REST de Supabase con el header `apikey`.
+
 ## Checkpoint de mañana: "¿dónde iba?"
 - [ ] Gemini key creada y en `.env.local`
 - [ ] `npm run dev` y CRM corriendo local (login + scoring)
 - [ ] Vercel desplegado con las 4 env vars
 - [ ] Usuario admin creado en Supabase Auth
 - [ ] service_role rotada y re-puesta en Vercel/.env.local
+- [ ] Secrets de GitHub cargados para el workflow de keep-alive de Supabase

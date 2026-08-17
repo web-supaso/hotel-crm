@@ -1,0 +1,40 @@
+name: Supabase Keep-Alive (Evitar pausa por inactividad)
+
+on:
+  schedule:
+    # Se ejecuta cada 3 días a las 06:00 UTC (garantiza que nunca llegue a los 7 días de inactividad)
+    - cron: '0 6 */3 * *'
+  workflow_dispatch: # Permite dispararlo manualmente desde GitHub Actions cuando quieras
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar y hacer Ping a Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::warning ::Faltan los secrets NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en el repositorio de GitHub."
+            echo "Configúralos en GitHub -> Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          echo "Enviando ping de actividad a Supabase..."
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
+            -X GET "$SUPABASE_URL/rest/v1/organizations?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+
+          echo "HTTP Status recibido: $HTTP_STATUS"
+          cat response.json
+          echo ""
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "✅ Ping exitoso. La base de datos de Supabase se mantendrá activa."
+          else
+            echo "::error ::El ping devolvió código $HTTP_STATUS. Revisa las credenciales o URL."
+            exit 1
+          fi

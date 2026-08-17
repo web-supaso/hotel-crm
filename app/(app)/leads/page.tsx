@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { MessageCircle, CreditCard, XCircle, Sparkles, Filter, Calendar, Users, Building2, Search, ArrowRight, Dog, Utensils, Heart, MessageSquare, RotateCw } from "lucide-react";
 import type { Lead, Organization, Property, Experience } from "@/lib/types";
+import { buildWhatsAppLink, formatWhatsAppNumber } from "@/lib/phone";
 import { DiscardModal } from "./components/discard-modal";
 import { ConvertDrawer } from "./components/convert-drawer";
 import { NewLeadModal } from "./components/new-lead-modal";
@@ -143,14 +144,16 @@ export default function LeadsPipelinePage() {
   }
 
   function getWhatsAppUrl(lead: Lead) {
-    const rawNumber = lead.guest_phone.replace(/\D/g, "");
-    const cleanNumber = rawNumber.startsWith("54") ? rawNumber : "549" + rawNumber;
     const nights = calculateNights(lead.requested_check_in, lead.requested_check_out);
-    const nightsText = nights > 0 ? ` de ${nights} ${nights === 1 ? 'noche' : 'noches'}` : '';
-    
-    const defaultMsg = lead.ai_suggested_reply || 
-      `¡Hola ${lead.guest_name}! Gracias por contactarnos por tu consulta para tu estadía${nightsText} en ${lead.property?.name || "nuestras instalaciones"} (${lead.requested_check_in || 'fechas a convenir'}). ¿En qué te podemos ayudar?`;
-    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(defaultMsg)}`;
+    return buildWhatsAppLink(
+      lead.guest_phone,
+      lead.guest_name,
+      lead.property?.name,
+      lead.requested_check_in,
+      lead.requested_check_out,
+      nights,
+      lead.ai_suggested_reply
+    );
   }
 
   return (
@@ -378,15 +381,27 @@ export default function LeadsPipelinePage() {
 
                 {/* Columna Acciones Rápidas */}
                 <div className="flex items-center gap-2 shrink-0 self-center lg:self-start pt-1">
-                  {/* Botón WhatsApp */}
-                  <a
-                    href={getWhatsAppUrl(lead)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-                  >
-                    <MessageCircle size={15} /> WhatsApp
-                  </a>
+                  {/* Botón WhatsApp Directo */}
+                  {formatWhatsAppNumber(lead.guest_phone) ? (
+                    <a
+                      href={getWhatsAppUrl(lead)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Abrir WhatsApp con ${lead.guest_name} (${lead.guest_phone})`}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"
+                    >
+                      <MessageCircle size={15} className="shrink-0" />
+                      <span>WhatsApp</span>
+                    </a>
+                  ) : (
+                    <span
+                      title="Sin número de WhatsApp registrado"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed border border-slate-200"
+                    >
+                      <MessageCircle size={15} className="shrink-0" />
+                      <span>WhatsApp</span>
+                    </span>
+                  )}
 
                   {/* Botón Convertir a Reserva */}
                   {lead.status !== "convertido" && lead.status !== "descartado" && (

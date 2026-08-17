@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, formatDateTime, INTERACTION_TYPE_LABELS } from "@/lib/labels";
 import { StatusBadge, ScoreRing } from "@/components/ui";
 import type { Interaction } from "@/lib/types";
+import { buildWhatsAppLink, formatWhatsAppNumber } from "@/lib/phone";
 import { ArrowLeft, MessageCircle, Calendar, Users, Building2, Dog, Utensils, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +38,19 @@ export default async function LeadDetailPage({
 
   const interactionsList = (interactions ?? []) as Interaction[];
 
-  const rawNumber = (lead.guest_phone || "").replace(/\D/g, "");
-  const cleanNumber = rawNumber.startsWith("54") ? rawNumber : "549" + rawNumber;
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(
-    lead.ai_suggested_reply || `¡Hola ${lead.guest_name}! Te contactamos por tu consulta de hospedaje.`
-  )}`;
+  const nights = (lead.requested_check_in && lead.requested_check_out)
+    ? Math.max(0, Math.round((new Date(lead.requested_check_out + "T00:00:00").getTime() - new Date(lead.requested_check_in + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  const whatsappUrl = buildWhatsAppLink(
+    lead.guest_phone || "",
+    lead.guest_name,
+    lead.property?.name,
+    lead.requested_check_in,
+    lead.requested_check_out,
+    nights,
+    lead.ai_suggested_reply
+  );
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -68,14 +77,23 @@ export default async function LeadDetailPage({
         </div>
 
         <div className="flex items-center gap-3">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-          >
-            <MessageCircle size={16} /> Abrir WhatsApp Directo
-          </a>
+          {formatWhatsAppNumber(lead.guest_phone) ? (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"
+            >
+              <MessageCircle size={16} /> Abrir WhatsApp Directo
+            </a>
+          ) : (
+            <span
+              title="Sin teléfono de WhatsApp"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed border border-slate-200"
+            >
+              <MessageCircle size={16} /> Sin WhatsApp
+            </span>
+          )}
         </div>
       </div>
 

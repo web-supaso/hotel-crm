@@ -11,35 +11,35 @@ jobs:
     name: Ping Supabase Database
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Validar y hacer Ping a Supabase REST API
         env:
-          RAW_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          RAW_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          RAW_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
+          RAW_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY || secrets.SUPABASE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           node -e '
-          let url = (process.env.RAW_URL || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_URL=/, "").trim();
-          let key = (process.env.RAW_KEY || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/, "").trim();
+          let url = (process.env.RAW_URL || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_URL=/, "").replace(/^SUPABASE_URL=/, "").trim();
+          let key = (process.env.RAW_KEY || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/, "").replace(/^SUPABASE_ANON_KEY=/, "").trim();
 
-          if (!url || !key) {
-            console.error("❌ Faltan los secrets NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en GitHub -> Settings -> Secrets and variables -> Actions.");
+          if (!url) {
+            console.error("❌ Falta el secret de URL en GitHub (nómbralo NEXT_PUBLIC_SUPABASE_URL o SUPABASE_URL).");
+            process.exit(1);
+          }
+          if (!key) {
+            console.error("❌ Falta el secret de API Key en GitHub (nómbralo NEXT_PUBLIC_SUPABASE_ANON_KEY o SUPABASE_ANON_KEY).");
             process.exit(1);
           }
 
-          // Eliminar barra final si la tiene
+          // Limpiar barra final
           url = url.replace(/\/+$/, "");
 
           if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            console.error("❌ La URL de Supabase no es válida:", url);
+            console.error("❌ La URL de Supabase no es válida (debe empezar con https://):", url);
             process.exit(1);
           }
 
           const targetEndpoint = `${url}/rest/v1/organizations?select=id&limit=1`;
-          console.log("📡 Enviando ping a:", targetEndpoint);
+          console.log("📡 URL base detectada:", url);
+          console.log("📡 Enviando ping de actividad...");
 
           fetch(targetEndpoint, {
             method: "GET",
@@ -51,17 +51,17 @@ jobs:
           .then(async (res) => {
             console.log("HTTP Status recibido:", res.status);
             const text = await res.text();
-            console.log("Respuesta:", text);
             if (res.ok) {
-              console.log("✅ Ping exitoso. La base de datos de Supabase se mantendrá activa.");
+              console.log("✅ Ping exitoso. La base de datos de Supabase se mantendrá activa sin pausarse.");
               process.exit(0);
             } else {
               console.error(`❌ El ping devolvió código ${res.status}: ${res.statusText}`);
+              console.error("Detalle de respuesta:", text);
               process.exit(1);
             }
           })
           .catch((err) => {
-            console.error("❌ Error en la conexión:", err.message);
+            console.error("❌ Error en la conexión de red:", err.message);
             process.exit(1);
           });
           '

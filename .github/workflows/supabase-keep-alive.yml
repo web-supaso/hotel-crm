@@ -17,23 +17,23 @@ jobs:
           RAW_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY || secrets.SUPABASE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           node -e '
-          let url = (process.env.RAW_URL || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_URL=/, "").replace(/^SUPABASE_URL=/, "").trim();
-          let key = (process.env.RAW_KEY || "").trim().replace(/^["'"'"']|["'"'"']$/g, "").replace(/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/, "").replace(/^SUPABASE_ANON_KEY=/, "").trim();
+          const rawUrl = process.env.RAW_URL || "";
+          const rawKey = process.env.RAW_KEY || "";
+
+          // Extraer URL limpia ignorando cualquier texto, salto de línea o comillas alrededor
+          const urlMatch = rawUrl.match(/https?:\/\/[^\s"'\r\n<>]+/);
+          const url = urlMatch ? urlMatch[0].replace(/\/+$/, "") : "";
+
+          // Extraer Key limpia ignorando cualquier texto, salto de línea o prefijo
+          const keyMatch = rawKey.match(/(?:sb_publishable_[a-zA-Z0-9_-]+|sb_secret_[a-zA-Z0-9_-]+|eyJ[a-zA-Z0-9._-]+|[a-zA-Z0-9._-]{20,})/);
+          const key = keyMatch ? keyMatch[0].trim() : rawKey.replace(/[\r\n\t\s"']/g, "");
 
           if (!url) {
-            console.error("❌ Falta el secret de URL en GitHub (nómbralo NEXT_PUBLIC_SUPABASE_URL o SUPABASE_URL).");
+            console.error("❌ No se encontró una URL válida en los secrets. Asegúrate de incluir https://tu-proyecto.supabase.co");
             process.exit(1);
           }
           if (!key) {
-            console.error("❌ Falta el secret de API Key en GitHub (nómbralo NEXT_PUBLIC_SUPABASE_ANON_KEY o SUPABASE_ANON_KEY).");
-            process.exit(1);
-          }
-
-          // Limpiar barra final
-          url = url.replace(/\/+$/, "");
-
-          if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            console.error("❌ La URL de Supabase no es válida (debe empezar con https://):", url);
+            console.error("❌ No se encontró una API Key válida en los secrets.");
             process.exit(1);
           }
 

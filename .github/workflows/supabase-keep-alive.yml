@@ -16,7 +16,7 @@ jobs:
           RAW_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
           RAW_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY || secrets.SUPABASE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          node -e '
+          cat << 'EOF' > ping-supabase.js
           const rawUrl = process.env.RAW_URL || "";
           const rawKey = process.env.RAW_KEY || "";
 
@@ -64,4 +64,6 @@ jobs:
             console.error("❌ Error en la conexión de red:", err.message);
             process.exit(1);
           });
-          '
+          EOF
+
+          node ping-supabase.js
